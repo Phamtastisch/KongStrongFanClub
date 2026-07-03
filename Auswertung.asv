@@ -31,7 +31,7 @@ eps_Luft = ones(size(f));
 eps_s_w   = 78.4;      % statische Permittivität
 eps_inf_w =  5.2;      % Hochfrequenz-Grenzwert
 tau_w     = 9.4e-12;   % Relaxationszeit [s]
-eps_water = eps_inf_w + (eps_s_w - eps_inf_w) ./ (1 + 1j*2*pi*f*tau_w);
+eps_destWasser = eps_inf_w + (eps_s_w - eps_inf_w) ./ (1 + 1j*2*pi*f*tau_w);
 
 % Kochsalzlösung (0.9 % NaCl, 25 °C)
 % → Debye-Term + ionischer Leitfähigkeitsterm
@@ -65,7 +65,7 @@ for k = 1:N
     L3 = log(S11_kochsalzLoesung(k));
 
     e1 = eps_Luft(k);
-    e2 = eps_water(k);
+    e2 = eps_destWasser(k);
     e3 = eps_kochsalzLoesung(k);
 
     % Lineares System:  M * [A; B; D] = rhs
@@ -88,56 +88,107 @@ for k = 1:N
     D_cal(k) = x(3);
 end
 
+
+
+%% S21-basierte Kalibrierung (gleiche Struktur wie S11)
+
+
+S21_Luft = MUT_Luft.S21_param;
+S21_destWasser = MUT_destWasser.S21_param;
+S21_kochsalzLoesung = MUT_kochsalzLoesung.S21_param;
+
+% Vorbereitung VOR dem Kalibrierungsloop (einmalig)
+S21_Luft_log         = log(abs(S21_Luft))         + 1j * unwrap(angle(S21_Luft));
+S21_destWasser_log   = log(abs(S21_destWasser))   + 1j * unwrap(angle(S21_destWasser));
+S21_kochsalz_log     = log(abs(S21_kochsalzLoesung)) + 1j * unwrap(angle(S21_kochsalzLoesung));
+
+A_cal_s21 = zeros(N,1);
+B_cal_s21 = zeros(N,1);
+D_cal_s21 = zeros(N,1);
+
+for k = 1:N
+    % L1 = log(S21_Luft(k));
+    % L2 = log(S21_destWasser(k));
+    % L3 = log(S21_kochsalzLoesung(k));
+    
+    L1 = S21_Luft_log(k);
+    L2 = S21_destWasser_log(k);
+    L3 = S21_kochsalz_log(k);
+
+
+    e1 = eps_Luft(k);
+    e2 = eps_destWasser(k);
+    e3 = eps_kochsalzLoesung(k);
+
+    M = [ L1, 1, -e1 ;
+        L2, 1, -e2 ;
+        L3, 1, -e3 ];
+
+    rhs = [ e1*L1 ; e2*L2 ; e3*L3 ];
+
+    x = M \ rhs;
+    A_cal_s21(k) = x(1);
+    B_cal_s21(k) = x(2);
+    D_cal_s21(k) = x(3);
+end
+
+
+
+
 %% --- 5. Permittivität der Probe berechnen ---
 % S11_DUT: komplexer S11-Vektor der unbekannten Probe
 
 MUT_Kongstrong_mitZucker = MUT(sparameters('KongStrong_mitZucker.s2p'))
 MUT_Kongstrong_ohneZucker = MUT(sparameters('KongStrong_ohneZucker.s2p'))
-MUT_Kongstrong_mitZucker = MUT(sparameters('KongStrong_ohneZucker.s2p'))
+MUT_Kongstrong_mitGeschmack = MUT(sparameters('KongStrong_mitGeschmack.s2p'))
 
 S11_Kongstrong_mitZucker = MUT_Kongstrong_mitZucker.S11_param;
 S11_Kongstrong_ohneZucker = MUT_Kongstrong_ohneZucker.S11_param;
+S11_Kongstrong_mitGeschmack = MUT_Kongstrong_mitGeschmack.S11_param;
 %Todo: Funktion schreiben, die MUT
 
 eps_Kongstrong_mitZucker = eps_from_MUT(A_cal,B_cal,D_cal, ... 
                            S11_Kongstrong_mitZucker,N)
 eps_Kongstrong_ohneZucker = eps_from_MUT(A_cal,B_cal,D_cal, ... 
     S11_Kongstrong_ohneZucker,N)
+eps_Kongstrong_mitGeschmack = eps_from_MUT(A_cal,B_cal,D_cal, ... 
+    S11_Kongstrong_mitGeschmack,N)
+
+
+S21_Kongstrong_mitZucker = MUT_Kongstrong_mitZucker.S21_param;
+S21_Kongstrong_ohneZucker = MUT_Kongstrong_ohneZucker.S21_param;
+S21_Kongstrong_mitGeschmack = MUT_Kongstrong_mitGeschmack.S21_param;
+%Todo: Funktion schreiben, die MUT
+
+eps_Kongstrong_mitZucker_S21 = eps_from_MUT(A_cal_s21,B_cal_s21,D_cal_s21, ... 
+    S21_Kongstrong_mitZucker,N)
+eps_Kongstrong_ohneZucker_S21 = eps_from_MUT(A_cal_s21,B_cal_s21,D_cal_s21, ... 
+    S21_Kongstrong_ohneZucker,N)
+eps_Kongstrong_mitGeschmack_S21 = eps_from_MUT(A_cal_s21,B_cal_s21,D_cal_s21, ... 
+    S21_Kongstrong_mitGeschmack,N)
+
+
 
 eps_array = {
 
-    eps_Kongstrong_ohneZucker, 'eps Kongstrong ohne Zucker' , 'g'
-    eps_Kongstrong_mitZucker,  'eps Kongstrong mit Zucker' , 'r'
-    eps
+    % eps_Kongstrong_ohneZucker, 'eps Kongstrong ohne Zucker' , 'g'
+    % eps_Kongstrong_mitZucker,  'eps Kongstrong mit Zucker' , 'r'
+    % eps_Kongstrong_mitGeschmack, 'eps Kongstrong mit Geschmack' , 'y'
+    eps_Kongstrong_ohneZucker_S21, 'eps Kongstrong ohne Zucker S21' , 'g'
+    eps_Kongstrong_mitZucker_S21,  'eps Kongstrong mit Zucker S21' , 'r'
+    eps_Kongstrong_mitGeschmack_S21, 'eps Kongstrong mit Geschmack S21' , 'y'
 
    
 }
 
-% %% --- 6. Plotten ---
-% figure; hold on;
-% 
-% for i = 1:size(eps_array,1) 
-% 
-% subplot(2,1,1)
-% plot(f/1e9, real(eps_array{i,1}), ...
-%     'Color', eps_array{i,3}, ...
-%     'DisplayName', eps_array{i,2},...
-%     LineWidth=1.5); grid on
-% 
-% 
-% xlabel('Frequenz (GHz)'); ylabel("\epsilon_r'")
-% title('Realteil der Permittivität (Probe)')
-% 
-% subplot(2,1,2)
-% plot(f/1e9, -imag(eps_array{i,1}), ...
-%     'Color', eps_array{i,3}, ...
-%     'DisplayName', eps_array{i,2},...
-%     LineWidth=1.5); grid on
-% 
-% xlabel('Frequenz (GHz)'); ylabel("\epsilon_r''")
-% title('Imaginärteil / Verlustfaktor')
-% legend show
-% end
+MUT_array = {
+    MUT_Luft,      'Luft',        'g'
+    MUT_destWasser,       'destWasser',         'r'
+    MUT_kochsalzLoesung ,    'Kochsalzlösung',      'y'
+    MUT_Kongstrong_ohneZucker,      'ohne Zucker',        'g'
+    MUT_Kongstrong_mitZucker,       'mit Zucker',         'r'
+    MUT_Kongstrong_mitGeschmack,    'mit Geschmack',      'y'
+    };
 
 %% --- 6. Plotten ---
 figure;
@@ -174,3 +225,89 @@ end
 legend(ax1, 'show', 'Location', 'best');
 legend(ax2, 'show', 'Location', 'best');
 
+%% --- 7. RF Plots: S11 & S21 (Amplitude & Phase) ---
+
+figure 
+
+for i = 1:size(MUT_array,1)
+    smithplot(MUT_array{i,1}..sobj_struct)
+end
+
+
+figure;
+
+% ===== Subplot 1: |S11| =====
+ax1 = subplot(2,2,1);
+hold(ax1,'on');
+title('|S_{11}| in dB');
+xlabel('Frequenz (GHz)');
+ylabel('|S_{11}| (dB)');
+grid on;
+
+% ===== Subplot 2: Phase S11 =====
+ax2 = subplot(2,2,2);
+hold(ax2,'on');
+title('Phase S_{11}');
+xlabel('Frequenz (GHz)');
+ylabel('Phase (°)');
+grid on;
+
+% ===== Subplot 3: |S21| =====
+ax3 = subplot(2,2,3);
+hold(ax3,'on');
+title('|S_{21}| in dB');
+xlabel('Frequenz (GHz)');
+ylabel('|S_{21}| (dB)');
+grid on;
+
+% ===== Subplot 4: Phase S21 =====
+ax4 = subplot(2,2,4);
+hold(ax4,'on');
+title('Phase S_{21}');
+xlabel('Frequenz (GHz)');
+ylabel('Phase (°)');
+grid on;
+
+
+for i = 1:size(MUT_array,1)
+
+    MUT_obj = MUT_array{i,1};
+    label   = MUT_array{i,2};
+    color   = MUT_array{i,3};
+
+    % --- S-Parameter ---
+    S11 = MUT_obj.S11_param;
+    
+    % Falls du S21 noch nicht im MUT hast:
+    % -> dann aus sobj_struct ziehen:
+    S21 = squeeze(MUT_obj.sobj_struct.Parameters(2,1,:));
+
+    % --- Betrag ---
+    S11_dB = 20*log10(abs(S11));
+    S21_dB = 20*log10(abs(S21));
+
+    % --- Phase (unwrap empfohlen!) ---
+    % S11_phase = unwrap(angle(S11)) * 180/pi;
+    % S21_phase = unwrap(angle(S21)) * 180/pi;
+    
+    S11_phase = angle(S11)* 180/pi;
+    S21_phase = angle(S21) * 180/pi;
+
+    % --- Plot ---
+    plot(ax1, f/1e9, S11_dB, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax2, f/1e9, S11_phase, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax3, f/1e9, S21_dB, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax4, f/1e9, S21_phase, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+end
+
+legend(ax1,'show');
+legend(ax2,'show');
+legend(ax3,'show');
+legend(ax4,'show');
