@@ -95,9 +95,13 @@ MUT_Kongstrong_mitZucker = MUT(sparameters('KongStrong_mitZucker.s2p'))
 MUT_Kongstrong_ohneZucker = MUT(sparameters('KongStrong_ohneZucker.s2p'))
 MUT_Kongstrong_mitGeschmack = MUT(sparameters('KongStrong_mitGeschmack.s2p'))
 
+MUT_Spiritus = MUT(sparameters('Spiritus.s2p'))
+
+
 S11_Kongstrong_mitZucker = MUT_Kongstrong_mitZucker.S11_param;
 S11_Kongstrong_ohneZucker = MUT_Kongstrong_ohneZucker.S11_param;
 S11_Kongstrong_mitGeschmack = MUT_Kongstrong_mitGeschmack.S11_param;
+S11_Spiritus = MUT_Spiritus.S11_param;
 %Todo: Funktion schreiben, die MUT
 
 eps_Kongstrong_mitZucker = eps_from_MUT(A_cal,B_cal,D_cal, ... 
@@ -106,15 +110,28 @@ eps_Kongstrong_ohneZucker = eps_from_MUT(A_cal,B_cal,D_cal, ...
     S11_Kongstrong_ohneZucker,N)
 eps_Kongstrong_mitGeschmack = eps_from_MUT(A_cal,B_cal,D_cal, ... 
     S11_Kongstrong_mitGeschmack,N)
+eps_Spiritus = eps_from_MUT(A_cal,B_cal,D_cal, ... 
+    S11_Spiritus,N)
 
 eps_array = {
 
-    eps_Kongstrong_ohneZucker, 'eps Kongstrong ohne Zucker' , 'g'
-    eps_Kongstrong_mitZucker,  'eps Kongstrong mit Zucker' , 'r'
-    eps_Kongstrong_mitGeschmack, 'eps Kongstrong mit Geschmack' , 'y'
-
+    eps_Kongstrong_ohneZucker, 'eps Kongstrong without Sugar' , 'g'
+    eps_Kongstrong_mitZucker,  'eps Kongstrong with Sugar' , 'r'
+    eps_Kongstrong_mitGeschmack, 'eps Kongstrong with Sugar & extra flavour' , 'y'
+    eps_Spiritus,'eps Spiritus' , 'c'
    
 }
+
+MUT_array = {
+    MUT_Luft,      'Air',        'b'
+    MUT_destWasser,       'destilled Water',         'm'
+    MUT_kochsalzLoesung ,    'NaCl 0.9% saline solution',      'w'
+    MUT_Kongstrong_ohneZucker,      'Kongstrong without Sugar',        'g'
+    MUT_Kongstrong_mitZucker,       'Kongstrong with Sugar ',         'r'
+    MUT_Kongstrong_mitGeschmack,    'Kongstrong with Sugar & extra flavour',      'y'
+    %MUT_Spiritus,'Spiritus' , 'c'
+    };
+
 
 % %% --- 6. Plotten ---
 % figure; hold on;
@@ -148,14 +165,14 @@ figure;
 % Erzeuge beide Subplots einmal und aktiviere hold für jede Achse
 ax1 = subplot(2,1,1);
 hold(ax1, 'on');
-xlabel('Frequenz (GHz)'); ylabel("\epsilon_r'")
-title('Realteil der Permittivität (Probe)')
+xlabel('Frequency (GHz)'); ylabel("\epsilon_r'")
+title('Real part of permittivity (sample)')
 grid(ax1, 'on');
 
 ax2 = subplot(2,1,2);
 hold(ax2, 'on');
-xlabel('Frequenz (GHz)'); ylabel("\epsilon_r''")
-title('Imaginärteil / Verlustfaktor')
+xlabel('Frequency (GHz)'); ylabel("\epsilon_r''")
+title('Imaginary part / loss factor')
 grid(ax2, 'on');
 
 % Plot in der Schleife (verwende geschweifte Klammern für Zellinhalt)
@@ -177,3 +194,77 @@ end
 legend(ax1, 'show', 'Location', 'best');
 legend(ax2, 'show', 'Location', 'best');
 
+
+figure;
+% ===== Subplot 1: |S11| =====
+ax1 = subplot(2,2,1);
+hold(ax1,'on');
+title('|S_{11}| in dB');
+xlabel('Frequency (GHz)');
+ylabel('|S_{11}| (dB)');
+grid on;
+
+% ===== Subplot 2: Phase S11 =====
+ax2 = subplot(2,2,2);
+hold(ax2,'on');
+title('Phase S_{11}');
+xlabel('Frequency (GHz)');
+ylabel('Phase (°)');
+grid on;
+
+% ===== Subplot 3: |S21| =====
+ax3 = subplot(2,2,3);
+hold(ax3,'on');
+title('|S_{21}| in dB');
+xlabel('Frequency (GHz)');
+ylabel('|S_{21}| (dB)');
+grid on;
+
+% ===== Subplot 4: Phase S21 =====
+ax4 = subplot(2,2,4);
+hold(ax4,'on');
+title('Phase S_{21}');
+xlabel('Frequency (GHz)');
+ylabel('Phase (°)');
+grid on;
+
+
+for i = 1:size(MUT_array,1)
+
+    MUT_obj = MUT_array{i,1};
+    label   = MUT_array{i,2};
+    color   = MUT_array{i,3};
+
+    % --- S-Parameter ---
+    S11 = MUT_obj.S11_param;
+
+    % Falls du S21 noch nicht im MUT hast:
+    % -> dann aus sobj_struct ziehen:
+    S21 = squeeze(MUT_obj.sobj_struct.Parameters(2,1,:));
+
+    % --- Betrag ---
+    S11_dB = 20*log10(abs(S11));
+    S21_dB = 20*log10(abs(S21));
+
+    % --- Phase (unwrap empfohlen!) ---
+    S11_phase = unwrap(angle(S11)) * 180/pi;
+    S21_phase = unwrap(angle(S21)) * 180/pi;
+
+    % --- Plot ---
+    plot(ax1, f/1e9, S11_dB, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax2, f/1e9, S11_phase, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax3, f/1e9, S21_dB, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+
+    plot(ax4, f/1e9, S21_phase, ...
+        'Color', color, 'DisplayName', label, 'LineWidth', 1.5);
+end
+
+legend(ax1,'show');
+legend(ax2,'show');
+legend(ax3,'show');
+legend(ax4,'show');
